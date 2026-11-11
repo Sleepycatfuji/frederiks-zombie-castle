@@ -3,6 +3,36 @@
   const $=id=>document.getElementById(id),audio=new Z.Audio();
   let renderer,selected='wood',lastBuilding='wood',toastTimer,bannerTimer,modalPaused=false;
   const game=new Z.Game({emit:onEvent});
+  const saves=new Z.SaveStore();
+  // Hold a write lock for this page, and release it before navigation/BFCache.
+  let releaseSaveLock=()=>{},lockPending=false;
+  function acquireSaveLock(){
+    if(!window.navigator?.locks||lockPending)return;
+    lockPending=true;saves.readOnly='Opening save storage. Try again in a moment.';
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),1000);
+    window.navigator.locks.request('frederiks-zombie-castle-writer',{signal:controller.signal},lock=>{
+      clearTimeout(timeout);lockPending=false;saves.readOnly=null;if(started)requestSave();
+      return new Promise(resolve=>{releaseSaveLock=()=>{resolve();saves.readOnly='This page is inactive. Reload before saving.';};});
+    }).catch(()=>{clearTimeout(timeout);lockPending=false;saves.readOnly='Another game tab is open. Close it and reload this tab before saving.';saveStatus({ok:false,message:saves.readOnly});});
+  }
+  let started=false,autoPending=false,lastAuto=0,recoveryRecords=[];
+  function saveStatus(result){$('save-status').textContent=result.message; $('save-status').className=result.ok?'save-ok':'save-error';}
+  function autosave(){if(!started)return {ok:true};autoPending=false;const r=saves.write('auto',game);saveStatus(r);return r;}
+  function requestSave(){if(!started||autoPending)return;autoPending=true;$('save-status').textContent='Saving…';$('save-status').className='';setTimeout(()=>{if(autoPending)autosave();},0);}
+  function protectCurrent(preserveLatest=false){let source=game;if(!started){if(!preserveLatest)return true;const state=saves.inspect();if(!state.ok){saveStatus(state);return false;}if(!state.records.length)return true;source=new Z.Game({starter:false});if(!source.importSave(state.records[0].payload).ok)return false;}const r=saves.write('checkpoint',source);if(!r.ok){saveStatus(r);toast(r.message,true);}return r.ok;}
+  function restore(record){
+    if(!record||!protectCurrent())return;
+    const r=game.importSave(record.payload);
+    if(!r.ok){toast(r.message,true);return;}
+    started=true;modalPaused=game.phase==='wave';closeAll();game.paused=modalPaused;renderer.hover=null;updateUI();autosave();
+    if(game.phase==='over')onEvent({type:'gameover'});
+  }
+  function recovery(){
+    const state=saves.inspect();recoveryRecords=state.records;$('recovery-slot').textContent='';
+    for(const [i,r] of recoveryRecords.entries()){const option=document.createElement('option');option.value=String(i);option.textContent=`${r.slot} · wave ${JSON.parse(r.payload).wave} · ${r.savedAt?new Date(r.savedAt).toLocaleString():'original save'}`;$('recovery-slot').append(option);}
+    $('recovery-slot').value='0';$('confirm-load').disabled=!recoveryRecords.length;showDialog('load-dialog');
+  }
   renderer=new Z.Renderer($('game'),game);
   const buildingTypes=Object.keys(Z.BUILDINGS),buttons={};
   const settingsKey='zombie-castle-audio-v1';
@@ -14,6 +44,7 @@
   function banner(message){const el=$('wave-banner');el.textContent=message;el.classList.add('show');clearTimeout(bannerTimer);bannerTimer=setTimeout(()=>el.classList.remove('show'),2900);}
   function onEvent(e){
     renderer?.event(e);
+    if(['place','remove','victory','gameover','wave','crumble','defeat'].includes(e.type))requestSave();
     const sound={place:'place',remove:'remove',crumble:'remove',zombieHit:'zombieHit',defeat:'defeat',castleHit:'castleHit',wallHit:'wallHit',wave:'wave',victory:'victory',gameover:'gameover'}[e.type];
     if(sound)audio.play(sound);if(e.type==='shot')audio.play(e.kind);
     if(e.type==='defeat')audio.play('coin');
@@ -74,19 +105,22 @@
   for(const d of document.querySelectorAll('dialog')){
     for(const b of d.querySelectorAll('.close-dialog,.close-action'))b.onclick=()=>d.close();
     d.addEventListener('close',()=>{if(!document.querySelector('dialog[open]')){game.paused=modalPaused;updateUI();}});
-    if(d.id==='over-dialog')d.addEventListener('cancel',e=>e.preventDefault());
+    if(d.id==='over-dialog'||d.id==='continue-dialog')d.addEventListener('cancel',e=>e.preventDefault());
   }
   $('help').onclick=$('shortcuts').onclick=()=>showDialog('help-dialog');
   $('mode').onclick=()=>showDialog('mode-dialog');
-  for(const [id,creative] of [['survival-mode',false],['creative-mode',true]])$(id).onclick=()=>{game.creative=creative;$('mode-dialog').close();toast(creative?'Creative Mode! Build with unlimited coins.':'Survival Mode! Make every coin count.');updateUI();};
-  $('save').onclick=()=>{const r=game.save();toast(r.message,!r.ok);};
-  $('load').onclick=$('over-load').onclick=()=>showDialog('load-dialog');
-  $('confirm-load').onclick=()=>{
-    const r=game.load();toast(r.message,!r.ok);
-    if(r.ok){modalPaused=false;closeAll();renderer.hover=null;updateUI();if(game.phase==='over')onEvent({type:'gameover'});}
-    else $('load-dialog').close();
+  for(const [id,creative] of [['survival-mode',false],['creative-mode',true]])$(id).onclick=()=>{game.creative=creative;$('mode-dialog').close();toast(creative?'Creative Mode! Build with unlimited coins.':'Survival Mode! Make every coin count.');updateUI();requestSave();};
+  function manualSave(){const r=saves.write('manual',game);saveStatus(r);toast(r.message,!r.ok);if(r.ok)$('save-confirm-dialog').close();}
+  $('save').onclick=()=>{
+    const state=saves.inspect();
+    if(!state.ok){saveStatus(state);return;}
+    if(state.records.some(r=>r.slot==='manual'||r.slot==='legacy')||state.invalid.some(r=>r.key.includes('manual.')))showDialog('save-confirm-dialog');
+    else manualSave();
   };
-  $('difficulty').onchange=()=>{game.difficulty=$('difficulty').value;toast('Difficulty changed for newly arriving zombies. Press Save to remember it.');};
+  $('confirm-save').onclick=manualSave;
+  $('load').onclick=$('over-load').onclick=recovery;
+  $('confirm-load').onclick=()=>restore(recoveryRecords[Number($('recovery-slot').value)]);
+  $('difficulty').onchange=()=>{game.difficulty=$('difficulty').value;requestSave();toast('Difficulty changed for newly arriving zombies.');};
   $('export-save').onclick=()=>{
     const url=URL.createObjectURL(new Blob([game.exportSave()],{type:'application/json'}));
     const link=document.createElement('a');link.href=url;link.download='frederiks-zombie-castle-save.json';link.click();
@@ -107,13 +141,14 @@
   };
   $('confirm-import').onclick=()=>{
     if(!pendingImport)return;
+    if(!protectCurrent(true))return;
     const result=game.importSave(pendingImport);pendingImport=null;
-    if(result.ok){modalPaused=false;closeAll();renderer.hover=null;updateUI();if(game.phase==='over')onEvent({type:'gameover'});}
-    toast(result.ok?'Kingdom imported! Press Save to keep it in this browser.':result.message,!result.ok);
+    if(result.ok){started=true;modalPaused=game.phase==='wave';closeAll();game.paused=modalPaused;renderer.hover=null;updateUI();autosave();if(game.phase==='over')onEvent({type:'gameover'});}
+    toast(result.ok?'Kingdom imported. Check the save indicator; manual saves are unchanged.':result.message,!result.ok);
   };
   $('new-game').onclick=()=>showDialog('new-dialog');
-  function newGame(){const creative=game.creative,difficulty=game.difficulty;game.reset();game.creative=creative;game.difficulty=difficulty;modalPaused=false;closeAll();select('wood');renderer.hover=null;updateUI();toast('A fresh adventure awaits! Your starter defenses are ready.');}
-  $('confirm-new').onclick=$('restart').onclick=newGame;
+  function newGame(){if(!protectCurrent(true))return;const creative=game.creative,difficulty=game.difficulty;game.reset();game.creative=creative;game.difficulty=difficulty;started=true;modalPaused=false;closeAll();select('wood');renderer.hover=null;updateUI();autosave();toast('A fresh adventure awaits! Your starter defenses are ready.');}
+  $('confirm-new').onclick=newGame;$('restart').onclick=()=>showDialog('new-dialog');
   $('start-wave').onclick=()=>{game.startWave();updateUI();};
   $('pause').onclick=()=>{if(game.phase==='wave'){game.paused=!game.paused;updateUI();}};
   $('speed').onclick=()=>{game.speed=game.speed===1?2:1;updateUI();};
@@ -128,9 +163,12 @@
   document.addEventListener('keydown',unlock,{once:true,capture:true});
   document.addEventListener('visibilitychange',()=>{
     audio.visibility(document.hidden).catch(()=>{});
-    if(document.hidden&&game.phase==='wave')game.paused=true;
+    if(document.hidden){if(game.phase==='wave')game.paused=true;autosave();}
     updateUI();
   });
+  window.addEventListener('pagehide',()=>{autosave();releaseSaveLock();});
+  window.addEventListener('pageshow',e=>{if(e.persisted)acquireSaveLock();});
+  window.addEventListener('storage',()=>{const state=saves.inspect();if(state.ok&&state.token!==saves.token){game.paused=true;saveStatus({ok:false,message:'Saves changed in another tab. Export this battlefield or reload before saving.'});}});
   document.addEventListener('keydown',e=>{
     if(document.querySelector('dialog[open]'))return;
     if(e.ctrlKey||e.metaKey||e.altKey||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
@@ -166,9 +204,18 @@
   }
   const bc=$('brand-castle').getContext('2d');bc.imageSmoothingEnabled=false;bc.scale(.34,.34);bc.translate(1,22);Z.drawCastle(bc,0);
   select('wood');updateUI();updateAudio();
-  let prev=performance.now(),uiClock=0;
-  function frame(now){const dt=Math.min(.05,(now-prev)/1000);prev=now;game.update(dt);renderer.draw(game.paused?0:dt);uiClock+=dt;if(uiClock>.1){updateUI();uiClock=0;}requestAnimationFrame(frame);}
+  let prev=performance.now(),uiClock=0,lastSnapshot='';
+  function frame(now){const dt=Math.min(.05,(now-prev)/1000);prev=now;game.update(dt);renderer.draw(game.paused?0:dt);uiClock+=dt;if(uiClock>.1){updateUI();uiClock=0;}if(started&&now-lastAuto>=1000){lastAuto=now;const current=game.exportSave();if(current!==lastSnapshot){const r=autosave();if(r.ok)lastSnapshot=current;}}requestAnimationFrame(frame);}
   requestAnimationFrame(frame);
+  acquireSaveLock();
+  const initial=saves.inspect();
+  $('continue-game').disabled=!initial.records.length;
+  $('continue-summary').textContent=!initial.ok?initial.message:initial.records.length?`Your latest valid kingdom is ready.${initial.invalid.length?' Some damaged saves were skipped; recovery copies are retained.':''}`:initial.invalid.length?'Saved data could not be read. It has not been deleted. Import a backup or choose a new kingdom.':'Start a kingdom or import your progress. Original saves will never be replaced.';
+  $('continue-game').onclick=()=>{const state=saves.accept();restore(state.records[0]);};
+  $('welcome-recovery').onclick=recovery;
+  $('welcome-import').onclick=()=>$('import-save').click();
+  $('welcome-new').onclick=()=>showDialog('new-dialog');
+  showDialog('continue-dialog');
   // Useful for local debugging and extending the game; never enables cheats automatically.
-  window.zombieCastle={game,audio,renderer};
+  window.zombieCastle={game,audio,renderer,saves};
 })(window.ZCD);
