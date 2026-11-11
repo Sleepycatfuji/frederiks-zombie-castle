@@ -2,12 +2,13 @@
 (function (Z) {
   'use strict';
   const DIFFICULTIES = {easy:.7, normal:1, hard:1.4};
-  const VERSION = 1, KEY = 'zombie-castle-defense-v1';
+  const VERSION = 2, KEY = 'zombie-castle-defense-v1';
   class Game {
     constructor({ emit = () => {}, random = Math.random, starter = true } = {}) {
       this.emit = emit; this.random = random; this.reset(starter);
     }
     reset(starter = true) {
+      this.savedExtras = {};
       this.cells = Array(150).fill(null); this.zombies = []; this.coins = 420;
       this.hp = 100; this.wave = 0; this.kills = 0; this.phase = 'build';
       this.difficulty = 'normal'; this.creative = false; this.paused = false; this.speed = 1;
@@ -172,7 +173,7 @@
       this.emit({type:'victory',income:this.lastIncome,mines,wave:this.wave});
     }
     snapshot() {
-      return {version:VERSION,difficulty:this.difficulty,cells:this.cells,coins:this.coins,hp:this.hp,wave:this.wave,kills:this.kills,phase:this.phase,creative:this.creative,zombies:this.zombies,remaining:this.remaining,spawnClock:this.spawnClock,nextId:this.nextId,waveTotal:this.waveTotal||0,waveDefeated:this.waveDefeated||0,lastIncome:this.lastIncome,elapsed:this.elapsed};
+      return {...this.savedExtras,version:VERSION,difficulty:this.difficulty,cells:this.cells,coins:this.coins,hp:this.hp,wave:this.wave,kills:this.kills,phase:this.phase,creative:this.creative,zombies:this.zombies,remaining:this.remaining,spawnClock:this.spawnClock,nextId:this.nextId,waveTotal:this.waveTotal||0,waveDefeated:this.waveDefeated||0,lastIncome:this.lastIncome,elapsed:this.elapsed};
     }
     exportSave() { return JSON.stringify(this.snapshot(), null, 2); }
     importSave(raw) {
@@ -180,18 +181,29 @@
       return this.load({getItem:()=>raw});
     }
     save(storage) {
-      try {(storage||localStorage).setItem(KEY,this.exportSave());return {ok:true,message:'Kingdom saved on this browser!'};}
+      // Explicit adapters support snapshot tools/tests; browser persistence belongs to SaveStore.
+      if(!storage)return {ok:false,message:'Use the game Save controls; the original save is read-only.'};
+      try {const raw=this.exportSave();storage.setItem(KEY,raw);if(storage.getItem(KEY)!==raw)throw Error('Write verification failed');return {ok:true,message:'Snapshot verified.'};}
       catch {return {ok:false,message:'Saving is unavailable. Check your browser storage settings.'};}
     }
     load(storage) {
       try {
         const raw=(storage||localStorage).getItem(KEY);if(!raw)return {ok:false,message:'No saved kingdom yet. Build one and press Save!'};
-        const s=JSON.parse(raw);this.validate(s);
+        const s=this.migrate(JSON.parse(raw));this.validate(s);
+        this.savedExtras={...s};
         for(const key of ['cells','coins','hp','wave','kills','phase','creative','zombies','remaining','spawnClock','nextId','waveTotal','waveDefeated','lastIncome','elapsed'])this[key]=s[key];
         this.difficulty=s.difficulty||'normal';
         this.pathDirty=true;this.paused=false;this.speed=1;this.emit({type:'loaded'});
         return {ok:true,message:'Welcome back! Your kingdom is ready.'};
       } catch {return {ok:false,message:'This save could not be loaded. Your current kingdom is safe.'};}
+    }
+    migrate(snapshot) {
+      if(!snapshot||typeof snapshot!=='object')throw Error('Invalid save');
+      // Pure migrations: never change the source object or its browser entry.
+      let s=JSON.parse(JSON.stringify(snapshot));
+      if(s.version===1)s={...s,version:2,difficulty:s.difficulty??'normal'};
+      if(s.version!==VERSION)throw Error('Unsupported save version');
+      return s;
     }
     validate(s) {
       const finite=(v,min=0,max=1e9)=>typeof v==='number'&&Number.isFinite(v)&&v>=min&&v<=max;

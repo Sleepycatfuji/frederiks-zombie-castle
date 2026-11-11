@@ -3,5 +3,5 @@
   "version": "1.0.0",
   "private": true,
   "description": "An original, buildless HTML5 Canvas game for Frederik",
-  "scripts": { "test": "node --test tests/*.test.cjs", "check": "node --check dist/js/data.js && node --check dist/js/engine.js && node --check dist/js/render.js && node --check dist/js/audio.js && node --check dist/js/app.js" }
+  "scripts": { "test": "node --test tests/*.test.cjs", "check": "node --check dist/js/data.js && node --check dist/js/engine.js && node --check dist/js/render.js && node --check dist/js/audio.js && node --check dist/js/saves.js && node --check dist/js/app.js" }
 }

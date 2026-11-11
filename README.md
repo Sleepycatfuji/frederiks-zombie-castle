@@ -1,5 +1,7 @@
 # Zombie Castle Defense
 
+P0 save protection is documented in [P0-SAVES.md](P0-SAVES.md), including review steps, compatibility, recovery and rollback.
+
 See [MIGRATION.md](MIGRATION.md) for original-save transfer, new portable saves, difficulty settings, deployment status and current verification limits.
 
 A complete first playable castle-building game for Frederik (age 8), built with HTML5 Canvas, CSS, and plain JavaScript. No backend, dependencies, paid services, accounts, external fonts, or downloaded game assets. All pixel graphics, sound effects, and the cheerful medieval-inspired musical loop are original and generated in code.
@@ -27,7 +29,7 @@ Open **http://localhost:8000**. Use the same browser and address to return to yo
 - Defeated zombies drop coins. Each completed wave pays **40 + 5 × wave number**, plus **30 per surviving gold mine**, and repairs 8 castle health (up to 100).
 - Remove a building for a 50% refund. The castle cannot be removed. Buildings do not repair themselves; replace damaged ones between attacks.
 - In Creative Mode, building costs nothing. Castle health and zombie attacks still work, so you can test your grandest defenses. Switch modes anytime.
-- **Save** stores the current kingdom and active wave in this browser's localStorage. **Load** replaces the current battlefield after confirmation. Starting over preserves your last save until you save again. Storage errors are shown without destroying the current game.
+- **Continue Game** restores the latest valid progress. Autosave checkpoints active combat and important changes; **Save** maintains a separate manual slot. **Load / Recover** offers earlier generations. New games/imports require confirmation and retain a recovery checkpoint. Storage errors never claim success. See P0-SAVES.md.
 - The game ends when castle health reaches zero. Choose **Build again** or load a saved kingdom. Waves continue indefinitely, becoming more difficult.
 - The game pauses when its tab is hidden. Choose **Resume** when you return.
 
@@ -107,7 +109,7 @@ npm run check
 
 No `npm install` is required. Tests cover all eight buildings, placement and refunds, automated attacks, area damage, slowing, walls and bridge damage, pathfinding, castle attacks, wave difficulty and victory, mine income, Creative Mode, pause/speed, restart, active-wave saving, invalid saves, interaction-gated audio, original music scheduling, independent audio toggles, and connected UI controls.
 
-The migrated release passes **29 automated tests**. See MIGRATION.md for production browser checks. To refresh the downloadable source after editing, run `python3 scripts/package.py`.
+The P0 branch passes **39 automated tests**, plus the browser persistence suite. See MIGRATION.md for production browser checks. To refresh the downloadable source after editing, run `python3 scripts/package.py`.
 
 These automated tests run the simulation and a lightweight DOM/Canvas/audio harness. They do not measure actual browser layout, speaker output, or autoplay policy. Visual browser testing and listening were unavailable in the build environment because its browser-control tool was missing. For a manual browser check: place each building; toggle a bridge twice; remove a wall; play a wave; save midway, reload, and load; try both audio toggles independently; deliberately let the castle fall and restart.
 
