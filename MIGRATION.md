@@ -54,7 +54,7 @@ source or Actions secrets. Relative URLs support the repository subpath.
 
 The expected URL after a successful deployment is:
 https://sleepycatfuji.github.io/frederiks-zombie-castle/
-This is not a confirmation that deployment has completed.
+Deployment succeeded on 2026-11-11. GitHub Pages is configured to use Actions.
 
 Future updates: edit source in `dist/`, run `npm test` and `npm run check`, then
 commit and push to `main`. Actions deploys automatically after tests pass.
@@ -68,13 +68,29 @@ legacy imports, invalid imports and difficulty persistence. This is buildless:
 `dist/` is the production artifact. The source ZIP is regenerated with
 `python3 scripts/package.py`.
 
-Browser automation was unavailable in the migration environment. Actual desktop
-and mobile rendering, touch interactions, real audio output, file download and
-file-picker behavior still need browser checks. Test Chrome, Firefox and Safari,
-plus iOS Safari and Android Chrome: place each building; operate bridges; start
-a wave; hear sound and music; change difficulty; Save; reload; Load; Export;
-Import in another browser; Save and reload again. Check narrow portrait and
-landscape layouts. Audio requires a click/tap first. Storage restrictions can
-prevent local saving; export remains available.
+Production checks passed in Chromium at desktop (1440 × 1000) and mobile-emulated
+(390 × 844) viewport sizes. Checks exercised all eight building placements,
+bridge operation, difficulty selection, painted Canvas, browser save/reload/load,
+active-wave save/reload, file export, import into another isolated browser
+context, and saving/reloading that imported state. There was no horizontal
+overflow or JavaScript error. Screenshots were visually reviewed.
+
+A real Web Audio graph entered the running state after interaction and produced
+non-zero audio samples. This verifies signal generation, not audible speaker
+output. Physical devices, Firefox, and Safari have not been tested.
+
+Chromium could not trust the environment's interception proxy certificate.
+Production browser requests were therefore fulfilled through Python HTTPS
+requests with certificate verification enabled against the environment CA;
+the browser retained the production URL and origin. Every production HTML,
+CSS, JavaScript and favicon file also matched the deployed source byte for
+byte; the downloadable source ZIP returned HTTP 200.
+
+For a manual cross-browser check, test Chrome, Firefox and Safari, plus iOS
+Safari and Android Chrome: place each building; operate bridges; start a wave;
+hear sound and music; change difficulty; Save; reload; Load; Export; Import in
+another browser; Save and reload again. Check portrait and landscape layouts.
+Audio requires a click/tap first. Storage restrictions can prevent local saving;
+export remains available.
 
 The original Sites project and its browser data have not been changed.

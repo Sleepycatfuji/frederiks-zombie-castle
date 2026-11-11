@@ -107,7 +107,7 @@ npm run check
 
 No `npm install` is required. Tests cover all eight buildings, placement and refunds, automated attacks, area damage, slowing, walls and bridge damage, pathfinding, castle attacks, wave difficulty and victory, mine income, Creative Mode, pause/speed, restart, active-wave saving, invalid saves, interaction-gated audio, original music scheduling, independent audio toggles, and connected UI controls.
 
-The first release passes **25 automated tests**. To refresh the downloadable source after editing, run `python3 scripts/package.py`.
+The migrated release passes **29 automated tests**. See MIGRATION.md for production browser checks. To refresh the downloadable source after editing, run `python3 scripts/package.py`.
 
 These automated tests run the simulation and a lightweight DOM/Canvas/audio harness. They do not measure actual browser layout, speaker output, or autoplay policy. Visual browser testing and listening were unavailable in the build environment because its browser-control tool was missing. For a manual browser check: place each building; toggle a bridge twice; remove a wall; play a wave; save midway, reload, and load; try both audio toggles independently; deliberately let the castle fall and restart.
 
