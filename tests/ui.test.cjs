@@ -77,3 +77,7 @@ test('difficulty UI survives Save, Load and New kingdom',()=>{
   assert.equal(u.game.difficulty,'hard');assert.equal(u.$('difficulty').value,'hard');
   u.$('new-game').click();u.$('confirm-new').click();assert.equal(u.game.difficulty,'hard');
 });
+
+test('loading an earlier kingdom retains the device personal best',()=>{
+ const u=boot();u.$('save').click();u.game.wave=3;u.game.kills=30;u.game.phase='over';u.game.recordScore();u.game.emit({type:'gameover'});const best=u.game.highScores['survival:normal'];assert.ok(best>0);u.$('over-load').click();u.$('recovery-slot').value=String(u.saves.inspect().records.findIndex(r=>r.slot==='manual'));u.$('confirm-load').click();assert.equal(u.game.wave,0);assert.equal(u.game.highScores['survival:normal'],best);
+});

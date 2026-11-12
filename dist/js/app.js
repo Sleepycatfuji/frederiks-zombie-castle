@@ -26,7 +26,7 @@ function bootCastle(Z){
     if(!record)return;return settle(protectCurrent(),ok=>{if(!ok)return;
     const r=game.importSave(record.payload);
     if(!r.ok){toast(r.message,true);return;}
-    started=true;modalPaused=['wave','countdown'].includes(game.phase);closeAll();game.paused=modalPaused;renderer.hover=null;updateUI();autosave();
+    rememberScores();started=true;modalPaused=['wave','countdown'].includes(game.phase);closeAll();game.paused=modalPaused;renderer.hover=null;updateUI();autosave();
     if(game.phase==='over')onEvent({type:'gameover'});
     });
   }
@@ -39,6 +39,14 @@ function bootCastle(Z){
   const buildingTypes=Object.keys(Z.BUILDINGS),buttons={};
   const settings=new Z.Settings(Z.native?.settingsStorage),toolbar=new Z.Toolbar(settings);
   const board=new Z.Leaderboard(settings,window.ZCD_LEADERBOARD||{});
+  const bestKey='frederiks-castle-defense.family-v2.personal-bests';
+  const localBests=settings.get(bestKey,{})||{};
+  function rememberScores(){
+    for(const [key,value] of Object.entries(game.highScores))if(Number.isFinite(value)&&value>=0)localBests[key]=Math.max(Number(localBests[key])||0,value);
+    game.highScores={...localBests};
+    settle(settings.put(bestKey,localBests),r=>{if(!r.ok)toast('Could not retain personal-best preferences. '+r.message,true);});
+  }
+  rememberScores();
   const settingsKey='zombie-castle-audio-v1';
   try{const p=JSON.parse(Z.native?Z.native.audio:localStorage.getItem(settingsKey));if(p&&typeof p.sfx==='boolean'&&typeof p.music==='boolean'){audio.sfx=p.sfx;audio.music=p.music;}}catch{/* Storage is optional. */}
   function toast(message,error=false){
@@ -48,6 +56,7 @@ function bootCastle(Z){
   function banner(message){const el=$('wave-banner');el.textContent=message;el.classList.add('show');clearTimeout(bannerTimer);bannerTimer=setTimeout(()=>el.classList.remove('show'),2900);}
   function onEvent(e){
     renderer?.event(e);
+    if(['victory','gameover'].includes(e.type))rememberScores();
     if(['place','remove','victory','gameover','wave','crumble','defeat'].includes(e.type))requestSave();
     const sound={place:'place',remove:'remove',crumble:'remove',zombieHit:'zombieHit',defeat:'defeat',castleHit:'castleHit',wallHit:'wallHit',wave:'wave',victory:'victory',gameover:'gameover'}[e.type];
     if(sound)audio.play(e.type==='place'&&e.buildingType?Z.BUILDINGS[e.buildingType]?.sounds?.place||sound:sound);if(e.type==='shot')audio.play(Z.BUILDINGS[e.kind]?.sounds?.attack||e.kind);
@@ -225,7 +234,7 @@ function bootCastle(Z){
     if(!pendingImport)return;
     return settle(protectCurrent(true),ok=>{if(!ok)return;
     const result=game.importSave(pendingImport);pendingImport=null;if(result.ok)board.invalidate(game,'Imported progress is local-only.');
-    if(result.ok){started=true;modalPaused=['wave','countdown'].includes(game.phase);closeAll();game.paused=modalPaused;renderer.hover=null;updateUI();autosave();if(game.phase==='over')onEvent({type:'gameover'});}
+    if(result.ok){rememberScores();started=true;modalPaused=['wave','countdown'].includes(game.phase);closeAll();game.paused=modalPaused;renderer.hover=null;updateUI();autosave();if(game.phase==='over')onEvent({type:'gameover'});}
     toast(result.ok?'Kingdom imported. Check the save indicator; manual saves are unchanged.':result.message,!result.ok);
     });
   };

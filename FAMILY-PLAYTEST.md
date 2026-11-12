@@ -89,7 +89,7 @@ Older releases cannot read version-3 exports; keep an original backup for rollba
 Browser storage can still be cleared, and a forced kill may lose the last
 unfinished checkpoint. Quota failures are shown; Export remains an escape hatch.
 
-Local personal bests are saved per mode/difficulty. Score = completed waves × 100
+Local personal bests are saved per mode/difficulty in separate device preferences as well as snapshots, so loading an earlier kingdom does not reduce a best. Score = completed waves × 100
 + defeated zombies × 10. See LEADERBOARD-SETUP.md for the shared Supabase service.
 Only newly started Survival runs qualify online. Creative use, changing difficulty
 mid-run, legacy/imported kingdoms or copied runs from another device stay local.

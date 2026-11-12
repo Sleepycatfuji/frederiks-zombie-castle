@@ -78,7 +78,7 @@ with tempfile.TemporaryDirectory(prefix='zcd-browser-') as profile, sync_playwri
     page.locator('#new-game').click();prior=snapshot(page);assert snapshot(page)==prior
     page.locator('#new-dialog .close-action').click();assert snapshot(page)==prior
     page.locator('#new-game').click();page.locator('#confirm-new').click()
-    assert page.evaluate('zombieCastle.saves.inspect().records.some(r=>r.slot==="checkpoint" && JSON.parse(r.payload).coins===912)')
+    assert page.evaluate('(expected)=>zombieCastle.saves.inspect().records.some(r=>{const s=JSON.parse(r.payload);return r.slot==="checkpoint" && s.coins===expected.coins && s.wave===expected.wave && s.difficulty===expected.difficulty && JSON.stringify(s.cells)===JSON.stringify(expected.cells);})',prior)
     assert page.evaluate('localStorage.getItem(ZCD.SAVE_KEY)')==legacy
     page.locator('#save').click();assert page.locator('#save-confirm-dialog').evaluate('(d)=>d.open')
     assert page.evaluate('zombieCastle.saves.inspect().records.find(r=>r.slot==="manual").raw')==manual
