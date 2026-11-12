@@ -1,0 +1,3 @@
+project_id = "frederiks-castle-defense-family"
+[functions.leaderboard]
+verify_jwt = false # The handler verifies the player JWT against Auth before any DB request.

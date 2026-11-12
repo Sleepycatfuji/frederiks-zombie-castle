@@ -14,7 +14,18 @@ window.ZCD = window.ZCD || {};
     moat:   { name: 'Water moat', short: 'Water moat', cost: 20, hp: 0, block: false, color: '#63c9db', description: 'Splish splash! Zombies wade at 35% speed.', detail: 'Slows zombies · cannot be broken' },
     bridge: { name: 'Drawbridge', short: 'Drawbridge', cost: 40, hp: 180, block: false, color: '#ad8455', description: 'Lower for a crossing. Raise to block the zombies!', detail: '180 health · raise or lower anytime' }
   };
+  // Keep retired definitions here so saved structures still simulate and draw.
+  const metadata={wood:['Defense',60],stone:['Defense',40],archer:['Attack',8],fire:['Attack',4],ice:['Attack',4],mine:['Resources',4],moat:['Special',40],bridge:['Defense',12]};
+  Z.registerBuilding=(id,definition)=>{
+    if(!['Defense','Attack','Resources','Special'].includes(definition.category)||!/^[a-z][a-z0-9-]*$/.test(id)||!definition.name||!Number.isFinite(definition.cost)||definition.cost<0||!Number.isFinite(definition.hp)||definition.hp<0||!Number.isInteger(definition.limit)||definition.limit<1)throw Error('Invalid building definition');
+    Z.BUILDINGS[id]={available:true,hidden:false,unlockWave:0,artwork:id,sounds:{place:'place',attack:id},abilities:{},...definition};
+  };
+  for(const [id,d] of Object.entries(Z.BUILDINGS))Z.registerBuilding(id,{...d,category:metadata[id][0],limit:metadata[id][1],abilities:{blocks:!!d.block,range:d.range||0,splash:d.splash||0,slow:d.slow||0,income:d.income||0,antiAir:['archer','ice'].includes(id)}});
+  Z.constructionAvailable=id=>Object.hasOwn(Z.BUILDINGS,id)&&Z.BUILDINGS[id].available&&!Z.BUILDINGS[id].hidden;
+  Z.constructionError=(id,wave)=>!Z.constructionAvailable(id)?'This structure is unavailable for new construction.':wave<Z.BUILDINGS[id].unlockWave?'Unlocks at wave '+Z.BUILDINGS[id].unlockWave+'.':'';
+  Z.WORLDS=[{name:'Frederik’s Meadow',ground:['#afce8c','#a9c985']},{name:'Amber Woods',ground:['#c9c088','#c2b67d']},{name:'Frosty Fields',ground:['#c9ddd8','#bfd3cf']},{name:'Moonlit Meadow',ground:['#90a9a0','#879f99']}];
   Z.MONSTERS = {
+    flying: {name:'Winged Wobbler',hp:35,speed:.85,damage:5,reward:12,color:'#91bb62'},
     silly: { name: 'Shuffler', hp: 43, speed: .64, damage: 7, reward: 9, color: '#91bb62' },
     speedy: { name: 'Buckethead', hp: 32, speed: 1.05, damage: 6, reward: 11, color: '#b5d06c' },
     big: { name: 'Big Bob', hp: 125, speed: .43, damage: 14, reward: 20, color: '#759b5c' }

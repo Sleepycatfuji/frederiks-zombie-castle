@@ -2,3 +2,13 @@ work/
 node_modules/
 *.tar.gz
 .DS_Store
+
+native-dist/
+android/
+__pycache__/
+
+.env
+.env.*
+!.env.example
+.supabase/
+supabase/.temp/

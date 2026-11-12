@@ -9,3 +9,11 @@
 footer a{color:#8a957c;text-decoration:none}footer a:hover{color:var(--purple);text-decoration:underline}
 
 .save-transfer{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:24px;padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}.save-transfer p{flex-basis:100%;margin:0;color:var(--muted);font-size:12px}.save-transfer select{font:inherit;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}.save-transfer button{min-height:44px}#game{touch-action:manipulation}
+
+#save-status{font-size:12px;max-width:100%;overflow-wrap:anywhere}#save-status.save-ok{color:#304941}#save-status.save-error{color:#9b4735}
+
+.tool-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}#tool-upgrade{font-size:10px}#game{touch-action:none}.tool-tabs button{min-height:40px}#phase-badge{white-space:normal}
+
+#open-inventory{width:100%;margin:0 0 12px;min-height:44px}.inventory-dialog{max-width:720px;max-height:85dvh;overflow:auto}.inventory-entry,.toolbar-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}.inventory-entry canvas,.toolbar-row canvas{width:42px;height:42px;flex-shrink:0;image-rendering:pixelated}.inventory-entry>div{flex:1}.inventory-entry p{font-size:12px;margin:3px 0}.inventory-entry button,.toolbar-row button{min-height:44px}.toolbar-row{flex-wrap:wrap}.toolbar-row strong{flex:1}.toolbar-row button{font-size:11px}#toolbar-status{font-size:12px}.inventory-entry button{flex-shrink:0}@media(max-width:650px){.inventory-dialog{padding:24px 16px}.toolbar-row strong{min-width:150px}.inventory-entry{flex-wrap:wrap}.inventory-entry>div{min-width:180px}.toolbar-row button{flex:1}.building-palette{overflow-x:auto}}
+
+#player-nickname,#leaderboard-difficulty{font:inherit;padding:10px;border:1px solid var(--line);border-radius:6px;max-width:100%}.leaderboard-scroll{overflow-x:auto}.leaderboard-scroll table{width:100%;border-collapse:collapse;font-size:12px}.leaderboard-scroll th,.leaderboard-scroll td{text-align:left;padding:9px;border-bottom:1px solid var(--line)}#leaderboard-status,#online-result{font-size:12px}#leaderboard-dialog button{min-height:44px}@media(max-width:650px){#open-leaderboard{font-size:10px;padding:6px}}

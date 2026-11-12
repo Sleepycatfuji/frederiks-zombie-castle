@@ -48,8 +48,9 @@ function boot(){
   const doc=new Element('document');doc.createElement=tag=>new Element(tag);doc.getElementById=id=>doc.querySelector('#'+id);doc.hidden=false;
   parse(fs.readFileSync(path.join(__dirname,'../dist/index.html'),'utf8'),doc);
   const storage=new Map(),frames=[];
-  const context={window:{},document:doc,console,performance:{now:()=>0},requestAnimationFrame:fn=>frames.push(fn),setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){},localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)}};
-  vm.createContext(context);for(const f of ['data','engine','audio','render','app'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../dist/js/'+f+'.js'),'utf8'),context,{filename:f+'.js'});
+  const context={window:{addEventListener(){}},document:doc,console,performance:{now:()=>0},requestAnimationFrame:fn=>frames.push(fn),setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){},localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)}};
+  vm.createContext(context);for(const f of ['data','engine','audio','render','saves','preferences','leaderboard','app'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../dist/js/'+f+'.js'),'utf8'),context,{filename:f+'.js'});
+  doc.getElementById('welcome-new').click();doc.getElementById('confirm-new').click();
   return {doc,$:id=>doc.getElementById(id),...context.window.zombieCastle,paintCalls:()=>paintCalls,frame:t=>frames.shift()(t),key:k=>doc.dispatch('keydown',{key:k,target:doc.getElementById('game')})};
 }
 test('full application boots, draws original sprites, and selects every palette item',()=>{
@@ -68,11 +69,15 @@ test('wave, pause, speed, mode, help, save/load, game-over and restart controls 
   u.$('help').click();assert.equal(u.$('help-dialog').open,true);assert.equal(u.game.paused,true);u.$('help-dialog').querySelector('.close-action').click();assert.equal(u.game.paused,false);
   u.$('mode').click();u.$('creative-mode').click();assert.equal(u.game.creative,true);
   u.$('save').click();const before=u.game.coins;u.game.coins=7;u.$('load').click();u.$('confirm-load').click();assert.equal(u.game.coins,before);assert.equal(u.game.phase,'wave');assert.equal(u.doc.querySelector('dialog[open]'),null);
-  u.game.hp=0;u.game.phase='over';u.game.emit({type:'gameover'});assert.equal(u.$('over-dialog').open,true);u.$('restart').click();assert.equal(u.game.phase,'build');assert.equal(u.game.hp,100);assert.equal(u.game.creative,true);assert.equal(u.$('over-dialog').open,false);
+  u.game.hp=0;u.game.phase='over';u.game.emit({type:'gameover'});assert.equal(u.$('over-dialog').open,true);u.$('restart').click();u.$('confirm-new').click();assert.equal(u.game.phase,'build');assert.equal(u.game.hp,100);assert.equal(u.game.creative,true);assert.equal(u.$('over-dialog').open,false);
 });
 test('difficulty UI survives Save, Load and New kingdom',()=>{
   const u=boot();u.$('difficulty').value='hard';u.$('difficulty').onchange();u.$('save').click();
   u.$('difficulty').value='easy';u.$('difficulty').onchange();u.$('load').click();u.$('confirm-load').click();
   assert.equal(u.game.difficulty,'hard');assert.equal(u.$('difficulty').value,'hard');
   u.$('new-game').click();u.$('confirm-new').click();assert.equal(u.game.difficulty,'hard');
+});
+
+test('loading an earlier kingdom retains the device personal best',()=>{
+ const u=boot();u.$('save').click();u.game.wave=3;u.game.kills=30;u.game.phase='over';u.game.recordScore();u.game.emit({type:'gameover'});const best=u.game.highScores['survival:normal'];assert.ok(best>0);u.$('over-load').click();u.$('recovery-slot').value=String(u.saves.inspect().records.findIndex(r=>r.slot==='manual'));u.$('confirm-load').click();assert.equal(u.game.wave,0);assert.equal(u.game.highScores['survival:normal'],best);
 });
