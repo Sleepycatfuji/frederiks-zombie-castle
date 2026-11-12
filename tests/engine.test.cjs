@@ -66,7 +66,7 @@ test('drawbridges lower for passage, raise as destructible walls, and cannot tra
 });
 test('mines pay only between waves, victory bonuses and castle repairs happen once',()=>{
   const {g,events}=setup();g.place('mine',1,1);g.place('mine',2,1);g.wave=2;g.hp=70;combat(g);g.wave=2;
-  const before=g.coins;g.update(.05);assert.equal(g.phase,'build');assert.equal(g.lastIncome,110);assert.equal(g.coins,before+110);assert.equal(g.hp,78);advance(g,2);assert.equal(g.coins,before+110);assert.equal(events.filter(e=>e.type==='victory').length,1);
+  const before=g.coins;g.update(.05);assert.equal(g.phase,'countdown');assert.equal(g.lastIncome,110);assert.equal(g.coins,before+110);assert.equal(g.hp,78);advance(g,2);assert.equal(g.coins,before+110);assert.equal(events.filter(e=>e.type==='victory').length,1);
 });
 test('waves increase in size and strength, introduce new enemies, and cannot double-start',()=>{
   const {g}=setup();assert.equal(g.startWave(),true);assert.equal(g.wave,1);assert.equal(g.remaining,9);assert.equal(g.startWave(),false);g.spawn();const hp1=g.zombies[0].hp;
@@ -106,8 +106,8 @@ test('missing, blocked, and corrupt storage leave the current kingdom intact',()
   g.save(storage);const s=JSON.parse(storage.getItem(Z.SAVE_KEY));s.cells[0]={type:'__proto__',hp:1,cooldown:0,raised:false};storage.setItem(Z.SAVE_KEY,JSON.stringify(s));assert.equal(g.load(storage).ok,false);assert.equal(JSON.stringify(g.cells),before);
 });
 test('complete starter-fort wave succeeds without manual attacks',()=>{
-  const {g,events}=setup(true);let seed=127;g.random=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};g.startWave();advance(g,100);
-  assert.equal(g.phase,'build');assert.equal(g.wave,1);assert.equal(g.kills,9);assert.ok(g.hp>0);assert.ok(events.some(e=>e.type==='victory'));
+  const {g,events}=setup(true);let seed=127;g.random=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};g.startWave();for(let i=0;i<2000&&g.phase==='wave';i++)g.update(.05);
+  assert.equal(g.phase,'countdown');assert.equal(g.wave,1);assert.equal(g.kills,9);assert.ok(g.hp>0);assert.ok(events.some(e=>e.type==='victory'));
 });
 test('portable saves preserve all buildings, coins, difficulty and active combat across browsers',()=>{
   const {g}=setup();g.creative=true;

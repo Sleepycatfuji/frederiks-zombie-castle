@@ -1,0 +1,6 @@
+{
+  "appId": "dk.frederik.castledefense.prototype",
+  "appName": "Frederik's Castle Defense",
+  "webDir": "native-dist",
+  "server": { "androidScheme": "https" }
+}

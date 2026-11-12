@@ -10,7 +10,11 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 server=http.server.ThreadingHTTPServer(('127.0.0.1',0),functools.partial(Quiet,directory=str(ROOT/'dist')))
 threading.Thread(target=server.serve_forever,daemon=True).start()
 URL=f'http://127.0.0.1:{server.server_port}/'
-def snapshot(page):return json.loads(page.evaluate('zombieCastle.game.exportSave()'))
+def gameplay(value):
+    state=json.loads(value) if isinstance(value,str) else dict(value)
+    for key in ['localOnly','onlineRun']:state.pop(key,None)
+    return state
+def snapshot(page):return gameplay(page.evaluate('zombieCastle.game.exportSave()'))
 def latest(page):return page.evaluate('zombieCastle.saves.inspect().records[0].payload')
 with tempfile.TemporaryDirectory(prefix='zcd-browser-') as profile, sync_playwright() as p:
     # Rendering/audio are stubbed here to isolate persistence; their Node suites run separately.
@@ -24,10 +28,10 @@ with tempfile.TemporaryDirectory(prefix='zcd-browser-') as profile, sync_playwri
     page.goto(URL);page.wait_for_selector('#continue-dialog[open]')
     assert page.evaluate('localStorage.length')==0,'startup must not overwrite storage'
     # Populate all buildings and active-wave fields, including unknown extension data.
-    legacy=page.evaluate('''()=>{const g=zombieCastle.game;g.creative=true;for(const [i,type] of Object.keys(ZCD.BUILDINGS).entries())g.place(type,i,1);g.cells[17].upgrades={level:3};g.savedExtras.resources={gems:12};g.coins=912;g.difficulty='hard';g.startWave();g.paused=false;for(let i=0;i<20;i++)g.update(.05);const s=g.snapshot();s.version=1;return JSON.stringify(s);}''')
+    legacy=page.evaluate('''()=>{const g=zombieCastle.game;g.creative=true;for(const [i,type] of Object.keys(ZCD.BUILDINGS).entries())g.place(type,i,1);g.cells[17].upgrades={level:3};g.savedExtras.resources={gems:12};g.coins=912;g.difficulty='hard';g.paused=false;g.startWave();for(let i=0;i<20;i++)g.update(.05);const s=g.snapshot();s.version=1;return JSON.stringify(s);}''')
     page.evaluate('(s)=>localStorage.setItem(ZCD.SAVE_KEY,s)',legacy)
     page.reload();page.locator('#continue-game').click()
-    expected=json.loads(legacy);expected['version']=2
+    expected=gameplay(legacy);expected['version']=3
     assert snapshot(page)==expected,'legacy migration must preserve the battlefield exactly'
     assert page.evaluate('localStorage.getItem(ZCD.SAVE_KEY)')==legacy
     assert page.evaluate('zombieCastle.game.paused')
@@ -41,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='zcd-browser-') as profile, sync_playwri
     # Resume and let real combat progress, then reload a precise checkpoint.
     page.locator('#pause').click();page.wait_for_timeout(1400);page.locator('#pause').click()
     page.evaluate('window.dispatchEvent(new Event("pagehide"))');before=snapshot(page)
-    assert json.loads(latest(page))==before
+    assert gameplay(latest(page))==before
     page.reload();page.locator('#continue-game').click();assert snapshot(page)==before
     print('PASS active-wave refresh; independent autosave/manual slots')
     context.close();context=launch();page=context.pages[0];page.goto(URL);page.locator('#continue-game').click();assert snapshot(page)==before
@@ -60,7 +64,7 @@ with tempfile.TemporaryDirectory(prefix='zcd-browser-') as profile, sync_playwri
     # Valid JSON tampering and truncation: fallback remains loadable and source bytes remain.
     older=page.evaluate('''()=>{const s=zombieCastle.saves.inspect();const newest=s.records[0];const next=s.records[1];localStorage.setItem(newest.key,'broken record');return next.payload;}''')
     page.reload();assert 'damaged' in page.locator('#continue-summary').inner_text();page.locator('#continue-game').click()
-    assert snapshot(page)==json.loads(older)
+    assert snapshot(page)==gameplay(older)
     page.wait_for_function('Object.keys(localStorage).some(k=>k.includes("recovery.") && localStorage.getItem(k)==="broken record")')
     print('PASS corrupted latest generation recovery and quarantine')
     # Failed writes never claim success and leave durable records intact.

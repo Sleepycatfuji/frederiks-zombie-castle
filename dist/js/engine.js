@@ -2,13 +2,13 @@
 (function (Z) {
   'use strict';
   const DIFFICULTIES = {easy:.7, normal:1, hard:1.4};
-  const VERSION = 2, KEY = 'zombie-castle-defense-v1';
+  const VERSION = 3, KEY = 'zombie-castle-defense-v1';
   class Game {
     constructor({ emit = () => {}, random = Math.random, starter = true } = {}) {
       this.emit = emit; this.random = random; this.reset(starter);
     }
     reset(starter = true) {
-      this.savedExtras = {};
+      this.savedExtras = {};this.countdown=0;this.highScores={};
       this.cells = Array(150).fill(null); this.zombies = []; this.coins = 420;
       this.hp = 100; this.wave = 0; this.kills = 0; this.phase = 'build';
       this.difficulty = 'normal'; this.creative = false; this.paused = false; this.speed = 1;
@@ -19,12 +19,19 @@
       }
       this.emit({type:'reset'});
     }
+    get worldIndex(){return Math.floor(Math.max(0,this.wave-1)/5);}
+    get world(){return Z.WORLDS[this.worldIndex%Z.WORLDS.length];}
+    score(){return Math.max(0,this.phase==='over'?this.wave-1:this.wave)*100+this.kills*10;}
+    recordScore(){const key=(this.creative?'creative':'survival')+':'+this.difficulty;this.highScores[key]=Math.max(this.highScores[key]||0,this.score());}
+    modificationError(){return this.phase==='countdown'?'Building locked during the countdown.':this.phase==='over'?'Start a new kingdom to build again.':'';}
     makeBuilding(type) { return {type, hp:Z.BUILDINGS[type].hp, cooldown:0, raised:false}; }
     get(x,y) { return Z.inside(x,y) ? this.cells[y*15+x] : null; }
     blocked(b) { return !!b && (Z.BUILDINGS[b.type].block || (b.type === 'bridge' && b.raised)); }
     canPlace(type,x,y) {
       if (!Object.hasOwn(Z.BUILDINGS,type)) return 'Choose a building first.';
-      if (this.phase === 'over') return 'Start a new kingdom to build again.';
+      if(this.modificationError())return this.modificationError();
+      const availability=Z.constructionError(type,this.wave);if(availability)return availability;
+      if(this.cells.filter(b=>b?.type===type).length>=Z.BUILDINGS[type].limit)return 'Placement limit reached for '+Z.BUILDINGS[type].name+'.';
       if (!Z.inside(x,y)) return 'Build inside the meadow.';
       if (Z.isCastle(x,y)) return 'This is your castle. Keep it safe!';
       if (this.get(x,y)) return 'There is already a building here.';
@@ -36,11 +43,11 @@
       const error = this.canPlace(type,x,y); if (error) return {ok:false,message:error};
       this.cells[y*15+x] = this.makeBuilding(type);
       if (!this.creative) this.coins -= Z.BUILDINGS[type].cost;
-      this.pathDirty = true; this.emit({type:'place',x:x+.5,y:y+.5});
+      this.pathDirty = true; this.emit({type:'place',buildingType:type,x:x+.5,y:y+.5});
       return {ok:true,message:Z.BUILDINGS[type].name+' built!'};
     }
     remove(x,y) {
-      if (this.phase==='over') return {ok:false,message:'Start a new kingdom to build again.'};
+      if(this.modificationError())return {ok:false,message:this.modificationError()};
       const b = this.get(x,y); if (!b) return {ok:false,message:'Choose a building to remove.'};
       const refund = Math.floor(Z.BUILDINGS[b.type].cost * .5);
       this.cells[y*15+x] = null; if (!this.creative) this.coins += refund;
@@ -48,21 +55,30 @@
       return {ok:true,message:`Building removed. ${this.creative ? '' : '+'+refund+' coins back!'}`};
     }
     toggleBridge(x,y) {
-      if (this.phase==='over') return {ok:false,message:'Start a new kingdom to use the bridges.'};
+      if(this.modificationError())return {ok:false,message:this.modificationError()};
       const b = this.get(x,y);
       if (!b || b.type!=='bridge') return {ok:false,message:'Click a drawbridge to raise or lower it.'};
       if (!b.raised && this.zombies.some(z=>Math.floor(z.x)===x && Math.floor(z.y)===y)) return {ok:false,message:'Wait until the zombie leaves the bridge.'};
       b.raised = !b.raised; this.pathDirty = true; this.emit({type:'place',x:x+.5,y:y+.5});
       return {ok:true,message:'Drawbridge '+(b.raised?'raised. Zombies shall not pass!':'lowered. Crossing open!')};
     }
+    upgrade(x,y){
+      const error=this.modificationError();if(error)return {ok:false,message:error};
+      const b=this.get(x,y);if(b?.type!=='archer')return {ok:false,message:'Choose an archer tower for Sky Watch.'};
+      if(b.upgrades?.skyWatch)return {ok:false,message:'This archer already has Sky Watch.'};
+      if(!this.creative&&this.coins<40)return {ok:false,message:'Sky Watch costs 40 coins.'};
+      b.upgrades={...b.upgrades,skyWatch:true};if(!this.creative)this.coins-=40;
+      this.emit({type:'place',x:x+.5,y:y+.5});return {ok:true,message:'Sky Watch: extra range and 50% more damage against flyers!'};
+    }
     startWave() {
-      if (this.phase!=='build') return false;
+      if(this.paused||!['build','countdown'].includes(this.phase))return false;
+      this.countdown=0;
       this.wave++; this.phase='wave'; this.remaining=6+this.wave*3;
       this.waveTotal=this.remaining; this.waveDefeated=0; this.spawnClock=.3;
       this.emit({type:'wave',wave:this.wave}); return true;
     }
     spawn() {
-      const r=this.random(), kind=this.wave>=4 && r<.2?'big':this.wave>=2 && r<.4?'speedy':'silly';
+      const r=this.random(), kind=this.wave>=6&&this.nextId%5===0?'flying':this.wave>=4 && r<.2?'big':this.wave>=2 && r<.4?'speedy':'silly';
       const d=Z.MONSTERS[kind], edge=Math.floor(this.random()*4);
       let x=Math.floor(this.random()*15), y=Math.floor(this.random()*10);
       if(edge===0) x=0; if(edge===1) x=14; if(edge===2) y=0; if(edge===3) y=9;
@@ -106,7 +122,12 @@
       }
     }
     update(dt) {
-      if(this.paused || this.phase!=='wave') return;
+      if(this.paused)return;
+      if(this.phase==='countdown'){
+        this.countdown=Math.max(0,this.countdown-Math.max(0,Math.min(dt,.1)));
+        if(this.countdown<1e-8){this.countdown=0;this.startWave();}return;
+      }
+      if(this.phase!=='wave')return;
       dt=Math.min(dt,.1)*this.speed; this.elapsed+=dt;
       if(this.pathDirty)this.buildPaths();
       this.spawnClock=Math.max(0,this.spawnClock-dt);
@@ -118,13 +139,14 @@
         const d=Z.BUILDINGS[b.type]; if(!d.range)continue;
         b.cooldown=Math.max(0,b.cooldown-dt); if(b.cooldown>0)continue;
         const x=i%15+.5,y=Math.floor(i/15)+.5;
-        const targets=this.zombies.filter(z=>z.hp>0&&Math.hypot(z.x-x,z.y-y)<=d.range);
+        const range=d.range+(b.type==='archer'&&b.upgrades?.skyWatch ? .6 : 0);
+        const targets=this.zombies.filter(z=>z.hp>0&&(z.kind!=='flying'||d.abilities?.antiAir)&&Math.hypot(z.x-x,z.y-y)<=range);
         targets.sort((a,c)=>this.distances[Math.floor(a.y)*15+Math.floor(a.x)]-this.distances[Math.floor(c.y)*15+Math.floor(c.x)]);
         const target=targets[0]; if(!target)continue;
         b.cooldown=d.rate;
         this.emit({type:'shot',kind:b.type,x,y,tx:target.x,ty:target.y});
-        const victims=d.splash?this.zombies.filter(z=>z.hp>0&&Math.hypot(z.x-target.x,z.y-target.y)<=d.splash):[target];
-        for(const z of victims) { if(d.slow)z.slow=d.slow; this.damageZombie(z,d.damage,b.type); }
+        const victims=d.splash?this.zombies.filter(z=>z.hp>0&&z.kind!=='flying'&&Math.hypot(z.x-target.x,z.y-target.y)<=d.splash):[target];
+        for(const z of victims) { if(d.slow)z.slow=d.slow; this.damageZombie(z,d.damage*(z.kind==='flying'&&b.type==='archer'&&b.upgrades?.skyWatch?1.5:1),b.type); }
       }
       this.zombies=this.zombies.filter(z=>z.hp>0);
       for(const z of this.zombies) {
@@ -135,9 +157,13 @@
           if(z.bite<=0) {
             this.hp=Math.max(0,this.hp-z.damage*.8); z.bite=1;
             this.emit({type:'castleHit',x:z.x,y:z.y});
-            if(this.hp<=0) { this.phase='over';this.emit({type:'gameover'});return; }
+            if(this.hp<=0) { this.phase='over';this.recordScore();this.emit({type:'gameover'});return; }
           }
           continue;
+        }
+        if(z.kind==='flying'){
+          const dx=7.5-z.x,dy=5-z.y,dist=Math.hypot(dx,dy),step=z.speed*(z.slow>0?.45:1)*dt;
+          if(dist>0){z.x+=dx/dist*Math.min(step,dist);z.y+=dy/dist*Math.min(step,dist);}continue;
         }
         let obstruction=this.get(cx,cy), ox=cx,oy=cy;
         if(!this.blocked(obstruction)) {
@@ -167,13 +193,15 @@
       if(this.remaining===0 && this.zombies.length===0) this.finishWave();
     }
     finishWave() {
-      this.phase='build';const mines=this.cells.filter(b=>b?.type==='mine').length;
-      this.lastIncome=40+this.wave*5+mines*30;this.coins+=this.lastIncome;
+      if(this.phase!=='wave')return;
+      this.phase='countdown';this.countdown=8;this.recordScore();const mines=this.cells.filter(b=>b?.type==='mine').length;
+      const resourceIncome=this.cells.reduce((sum,b)=>sum+(Z.BUILDINGS[b?.type]?.income||0),0);
+      this.lastIncome=40+this.wave*5+resourceIncome;this.coins+=this.lastIncome;
       this.hp=Math.min(100,this.hp+8);
       this.emit({type:'victory',income:this.lastIncome,mines,wave:this.wave});
     }
     snapshot() {
-      return {...this.savedExtras,version:VERSION,difficulty:this.difficulty,cells:this.cells,coins:this.coins,hp:this.hp,wave:this.wave,kills:this.kills,phase:this.phase,creative:this.creative,zombies:this.zombies,remaining:this.remaining,spawnClock:this.spawnClock,nextId:this.nextId,waveTotal:this.waveTotal||0,waveDefeated:this.waveDefeated||0,lastIncome:this.lastIncome,elapsed:this.elapsed};
+      return {...this.savedExtras,version:VERSION,countdown:this.countdown,highScores:this.highScores,difficulty:this.difficulty,cells:this.cells,coins:this.coins,hp:this.hp,wave:this.wave,kills:this.kills,phase:this.phase,creative:this.creative,zombies:this.zombies,remaining:this.remaining,spawnClock:this.spawnClock,nextId:this.nextId,waveTotal:this.waveTotal||0,waveDefeated:this.waveDefeated||0,lastIncome:this.lastIncome,elapsed:this.elapsed};
     }
     exportSave() { return JSON.stringify(this.snapshot(), null, 2); }
     importSave(raw) {
@@ -191,7 +219,7 @@
         const raw=(storage||localStorage).getItem(KEY);if(!raw)return {ok:false,message:'No saved kingdom yet. Build one and press Save!'};
         const s=this.migrate(JSON.parse(raw));this.validate(s);
         this.savedExtras={...s};
-        for(const key of ['cells','coins','hp','wave','kills','phase','creative','zombies','remaining','spawnClock','nextId','waveTotal','waveDefeated','lastIncome','elapsed'])this[key]=s[key];
+        for(const key of ['cells','coins','hp','wave','kills','phase','creative','zombies','remaining','spawnClock','nextId','waveTotal','waveDefeated','lastIncome','elapsed','countdown','highScores'])this[key]=s[key];
         this.difficulty=s.difficulty||'normal';
         this.pathDirty=true;this.paused=false;this.speed=1;this.emit({type:'loaded'});
         return {ok:true,message:'Welcome back! Your kingdom is ready.'};
@@ -202,6 +230,7 @@
       // Pure migrations: never change the source object or its browser entry.
       let s=JSON.parse(JSON.stringify(snapshot));
       if(s.version===1)s={...s,version:2,difficulty:s.difficulty??'normal'};
+      if(s.version===2)s={...s,version:3,countdown:s.phase==='build'&&s.wave>0?8:0,phase:s.phase==='build'&&s.wave>0?'countdown':s.phase,highScores:s.highScores??{}};
       if(s.version!==VERSION)throw Error('Unsupported save version');
       return s;
     }
@@ -209,10 +238,11 @@
       const finite=(v,min=0,max=1e9)=>typeof v==='number'&&Number.isFinite(v)&&v>=min&&v<=max;
       if(!s||s.version!==VERSION||!Array.isArray(s.cells)||s.cells.length!==150||!Array.isArray(s.zombies)||s.zombies.length>10000)throw Error('Invalid save');
       if(s.difficulty!==undefined&&!Object.hasOwn(DIFFICULTIES,s.difficulty))throw Error('Invalid difficulty');
-      if(!['build','wave','over'].includes(s.phase)||typeof s.creative!=='boolean')throw Error('Invalid state');
+      if(!['build','countdown','wave','over'].includes(s.phase)||typeof s.creative!=='boolean')throw Error('Invalid state');
       for(const k of ['coins','wave','kills','remaining','nextId','waveTotal','waveDefeated','lastIncome','elapsed'])if(!finite(s[k]))throw Error('Invalid number');
       if(!finite(s.hp,0,100)||!finite(s.spawnClock,-10,10))throw Error('Invalid state');
-      if(s.phase==='build'&&(s.zombies.length||s.remaining))throw Error('Invalid wave');
+      if(!finite(s.countdown,0,8)||(s.phase==='countdown'&&(s.countdown<=0||s.wave<1))||(s.phase!=='countdown'&&s.countdown!==0)||!s.highScores||Array.isArray(s.highScores)||typeof s.highScores!=='object'||Object.values(s.highScores).some(v=>!finite(v)))throw Error('Invalid progression');
+      if(['build','countdown'].includes(s.phase)&&(s.zombies.length||s.remaining))throw Error('Invalid wave');
       for(let i=0;i<150;i++) {
         const b=s.cells[i];if(b===null)continue;
         if(!b||!Object.hasOwn(Z.BUILDINGS,b.type)||Z.isCastle(i%15,Math.floor(i/15))||!finite(b.hp,0,Z.BUILDINGS[b.type].hp)||!finite(b.cooldown,-1,10)||typeof b.raised!=='boolean')throw Error('Invalid building');
@@ -225,5 +255,5 @@
       }
     }
   }
-  Z.Game=Game;Z.SAVE_KEY=KEY;
+  Z.Game=Game;Z.SAVE_KEY=KEY;Z.SAVE_VERSION=VERSION;
 })(window.ZCD);

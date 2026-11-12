@@ -49,7 +49,7 @@ function boot(){
   parse(fs.readFileSync(path.join(__dirname,'../dist/index.html'),'utf8'),doc);
   const storage=new Map(),frames=[];
   const context={window:{addEventListener(){}},document:doc,console,performance:{now:()=>0},requestAnimationFrame:fn=>frames.push(fn),setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){},localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)}};
-  vm.createContext(context);for(const f of ['data','engine','audio','render','saves','app'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../dist/js/'+f+'.js'),'utf8'),context,{filename:f+'.js'});
+  vm.createContext(context);for(const f of ['data','engine','audio','render','saves','preferences','leaderboard','app'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../dist/js/'+f+'.js'),'utf8'),context,{filename:f+'.js'});
   doc.getElementById('welcome-new').click();doc.getElementById('confirm-new').click();
   return {doc,$:id=>doc.getElementById(id),...context.window.zombieCastle,paintCalls:()=>paintCalls,frame:t=>frames.shift()(t),key:k=>doc.dispatch('keydown',{key:k,target:doc.getElementById('game')})};
 }

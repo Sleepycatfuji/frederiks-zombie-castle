@@ -4,7 +4,7 @@ import zipfile
 
 root = Path(__file__).resolve().parents[1]
 target = root / "dist" / "zombie-castle-defense.zip"
-include = [root / p for p in ("dist", "tests", "scripts", ".github", "README.md", "MIGRATION.md", "P0-SAVES.md", "LICENSE", "package.json", ".gitignore")]
+include = [root / p for p in ("dist", "tests", "scripts", ".github", "README.md", "MIGRATION.md", "P0-SAVES.md", "FAMILY-PLAYTEST.md", "LEADERBOARD-SETUP.md", "native", "supabase", "backend", "capacitor.config.json", "package-lock.json", "LICENSE", "package.json", ".gitignore")]
 files = []
 for item in include:
     files.extend(item.rglob("*") if item.is_dir() else [item])

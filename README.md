@@ -1,4 +1,6 @@
-# Zombie Castle Defense
+# Frederik's Castle Defense
+
+This is the separate **family-playtest-v2** prototype. Start with [FAMILY-PLAYTEST.md](FAMILY-PLAYTEST.md) for browser instructions, changed rules, inventory, saves and Android preparation. [LEADERBOARD-SETUP.md](LEADERBOARD-SETUP.md) covers the shared backend. The live Pages site is unchanged.
 
 P0 save protection is documented in [P0-SAVES.md](P0-SAVES.md), including review steps, compatibility, recovery and rollback.
 

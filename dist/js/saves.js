@@ -1,7 +1,7 @@
 /* Two independently verified generations per slot. Legacy storage is read-only. */
 (function(Z){
   'use strict';
-  const PREFIX='frederiks-zombie-castle.saves.', FORMAT=1;
+  const PREFIX='frederiks-castle-defense.family-v2.', READ_PREFIX='frederiks-zombie-castle.saves.', FORMAT=1;
   const keys=['auto.a','auto.b','manual.a','manual.b'];
   function checksum(text){let n=2166136261;for(let i=0;i<text.length;i++){n^=text.charCodeAt(i);n=Math.imul(n,16777619);}return (n>>>0).toString(16);}
   class SaveStore {
@@ -14,7 +14,7 @@
         const e=JSON.parse(raw);
         if(e.format!==FORMAT)throw Error('Unsupported storage format');
         body=e.body;
-        if(!body||e.checksum!==checksum(JSON.stringify(body))||!Number.isSafeInteger(body.revision)||body.revision<1||!Number.isFinite(body.savedAt)||!['auto','manual','checkpoint'].includes(body.slot)||!key.startsWith(PREFIX+body.slot+'.'))throw Error('Invalid record');
+        if(!body||e.checksum!==checksum(JSON.stringify(body))||!Number.isSafeInteger(body.revision)||body.revision<1||!Number.isFinite(body.savedAt)||!['auto','manual','checkpoint'].includes(body.slot)||![PREFIX,READ_PREFIX].some(p=>key.startsWith(p+body.slot+'.')))throw Error('Invalid record');
         payload=body.payload;
       }
       const game=new Z.Game({starter:false});
@@ -23,8 +23,8 @@
     }
     inspect(){
       try {
-        const storage=this.backend(),names=[...keys.map(k=>PREFIX+k),Z.SAVE_KEY];
-        for(let i=0;i<storage.length;i++){const key=storage.key(i);if(key?.startsWith(PREFIX+'checkpoint.'))names.push(key);}
+        const storage=this.backend(),names=[...keys.map(k=>PREFIX+k),...keys.map(k=>READ_PREFIX+k),Z.SAVE_KEY];
+        for(let i=0;i<storage.length;i++){const key=storage.key(i);if((key?.startsWith(PREFIX+'checkpoint.')||key?.startsWith(READ_PREFIX+'checkpoint.')))names.push(key);}
         const pairs=names.map(k=>[k,storage.getItem(k)]);
         const records=[],invalid=[];let future=false;
         for(const [key,raw] of pairs){
@@ -32,7 +32,7 @@
           try{records.push(this.parse(raw,key));}
           catch {
             invalid.push({key,raw});
-            try{const e=JSON.parse(raw);const s=key===Z.SAVE_KEY?e:JSON.parse(e.body?.payload||'null');if((key!==Z.SAVE_KEY&&typeof e.format==='number'&&e.format>FORMAT)||s?.version>2)future=true;}catch{}
+            try{const e=JSON.parse(raw);const s=key===Z.SAVE_KEY?e:JSON.parse(e.body?.payload||'null');if((key!==Z.SAVE_KEY&&typeof e.format==='number'&&e.format>FORMAT)||s?.version>Z.SAVE_VERSION)future=true;}catch{}
           }
         }
         records.sort((a,b)=>b.revision-a.revision||b.savedAt-a.savedAt);
@@ -51,7 +51,7 @@
         if(state.token!==this.token)return {ok:false,conflict:true,message:'Another tab changed your saves. Reload to choose the latest progress; export this battlefield first.'};
         const storage=this.backend(),payload=game.exportSave();
         const check=new Z.Game({starter:false});if(!check.importSave(payload).ok)throw Error('Invalid battlefield');
-        const candidates=state.records.filter(r=>r.slot===slot);
+        const candidates=state.records.filter(r=>r.slot===slot&&r.key.startsWith(PREFIX));
         const newest=candidates[0];
         const target=slot==='checkpoint'?PREFIX+'checkpoint.'+Date.now()+'.'+(state.records[0]?.revision+1||1):PREFIX+slot+'.'+(newest?.key.endsWith('.a')?'b':'a');
         if(slot==='checkpoint'&&storage.getItem(target)!==null)throw Error('Checkpoint collision');
