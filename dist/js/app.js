@@ -40,7 +40,8 @@ function bootCastle(Z){
   const settings=new Z.Settings(Z.native?.settingsStorage),toolbar=new Z.Toolbar(settings);
   const board=new Z.Leaderboard(settings,window.ZCD_LEADERBOARD||{});
   const bestKey='frederiks-castle-defense.family-v2.personal-bests';
-  const localBests=settings.get(bestKey,{})||{};
+  const localBests=Object.create(null),storedBests=settings.get(bestKey,{});
+  if(storedBests&&typeof storedBests==='object'&&!Array.isArray(storedBests))for(const [key,value] of Object.entries(storedBests))if(Number.isFinite(value)&&value>=0)localBests[key]=value;
   function rememberScores(){
     for(const [key,value] of Object.entries(game.highScores))if(Number.isFinite(value)&&value>=0)localBests[key]=Math.max(Number(localBests[key])||0,value);
     game.highScores={...localBests};
