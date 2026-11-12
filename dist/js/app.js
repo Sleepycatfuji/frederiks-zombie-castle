@@ -171,7 +171,7 @@ function bootCastle(Z){
     if(e.clientX<r.left||e.clientX>=r.left+r.width||e.clientY<r.top||e.clientY>=r.top+r.height)return;
     const cell=cellFromEvent(e);renderer.hover=cell;if(stroke?.id===e.pointerId)strokeTo(cell);
   });
-  function endStroke(){if(stroke){stroke=null;suppressNextClick=true;}}
+  function endStroke(e){if(stroke&&e?.pointerId!==undefined&&stroke.id!==e.pointerId)return;if(stroke){stroke=null;suppressNextClick=true;}}
   $('game').addEventListener('pointerup',endStroke);$('game').addEventListener('pointercancel',endStroke);$('game').addEventListener('lostpointercapture',endStroke);
   $('game').addEventListener('pointerleave',()=>renderer.hover=null);
   $('game').addEventListener('click',e=>{if(suppressNextClick){suppressNextClick=false;return;}act(cellFromEvent(e));});
