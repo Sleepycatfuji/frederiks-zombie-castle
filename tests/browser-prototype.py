@@ -3,6 +3,7 @@ import functools,http.server,json,os,shutil,threading
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+SCREENSHOTS=ROOT/'work'/'screenshots';SCREENSHOTS.mkdir(parents=True,exist_ok=True)
 class Quiet(http.server.SimpleHTTPRequestHandler):
  def log_message(self,*args):pass
 server=http.server.ThreadingHTTPServer(('127.0.0.1',0),functools.partial(Quiet,directory=str(ROOT/'dist')))
@@ -57,7 +58,7 @@ with sync_playwright() as p:
   page.reload();page.locator('#continue-game').click()
   assert not page.evaluate('document.documentElement.scrollWidth>innerWidth')
   assert not errors,errors
-  page.screenshot(path=f'/workspace/work/family-v2-{"phone" if mobile else "desktop"}.png',full_page=True)
+  page.screenshot(path=str(SCREENSHOTS/f'family-v2-{"phone" if mobile else "desktop"}.png'),full_page=True)
   print('PASS', 'touch-phone' if mobile else 'desktop', 'drag, cost, inventory categories/favorites/reordering, countdown lock/pause/early/auto, save reload, world progression, original audio controls, no JS errors',flush=True)
   ctx.close()
  browser.close()
