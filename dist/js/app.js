@@ -43,8 +43,10 @@ function bootCastle(Z){
   const localBests=Object.create(null),storedBests=settings.get(bestKey,{});
   if(storedBests&&typeof storedBests==='object'&&!Array.isArray(storedBests))for(const [key,value] of Object.entries(storedBests))if(Number.isFinite(value)&&value>=0)localBests[key]=value;
   function rememberScores(){
+    const before=JSON.stringify(localBests);
     for(const [key,value] of Object.entries(game.highScores))if(Number.isFinite(value)&&value>=0)localBests[key]=Math.max(Number(localBests[key])||0,value);
     game.highScores={...localBests};
+    if(JSON.stringify(localBests)===before)return;
     settle(settings.put(bestKey,localBests),r=>{if(!r.ok)toast('Could not retain personal-best preferences. '+r.message,true);});
   }
   rememberScores();
