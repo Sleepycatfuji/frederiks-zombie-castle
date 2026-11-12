@@ -25,7 +25,7 @@ Deno.serve(async(request:Request)=>{
     const hash=[...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');
     const response=await fetch(url+'/rest/v1/rpc/family_leaderboard',{method:'POST',headers:{apikey:service,Authorization:'Bearer '+service,'Content-Type':'application/json'},body:JSON.stringify({p_actor:player.id,p_ip:hash,p_action:body.action,p_data:body.data||{}}),signal:AbortSignal.timeout(10000)});
     const data=await response.json();
-    if(!response.ok){const message=String(data.message||'Invalid score request.');return reply(message.includes('Rate limit')?429:400,{error:message.includes('Rate limit')?'Too many requests. Try again in a minute.':message});}
+    if(!response.ok){const message=String(data.message||'Invalid score request.');if(message.includes('Rate limit'))return reply(429,{error:'Too many requests. Try again in a minute.'});if(data.code==='P0001'||String(data.code||'').startsWith('22'))return reply(400,{error:message});return reply(503,{error:'Leaderboard database setup is incomplete or unavailable. Scores stay queued on this device.'});}
     return reply(200,data);
   }catch{return reply(503,{error:'Leaderboard unavailable. Your queued scores stay on this device.'});}
 });
